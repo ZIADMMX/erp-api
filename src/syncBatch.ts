@@ -12,6 +12,8 @@ export interface SyncRow {
   uuid: string;
   updatedAt: string;
   data: object;
+  /** الصف اتمسح على الديسك توب */
+  deleted: boolean;
 }
 
 const bad = (message: string) => new HttpError(400, 'BAD_SYNC_BATCH', message);
@@ -25,9 +27,9 @@ export function validateBatch(body: unknown, now = Date.now()): SyncRow[] {
   if (!Array.isArray(records) || records.length === 0 || records.length > MAX_RECORDS) {
     throw bad(`records لازم تكون قائمة من 1 لـ ${MAX_RECORDS} صف`);
   }
-  const byKey = new Map<string, { table: string; uuid: string; time: number; data: object }>();
+  const byKey = new Map<string, { table: string; uuid: string; time: number; data: object; deleted: boolean }>();
   for (const record of records) {
-    const { table, uuid, updated_at: updatedAt, data } = (record ?? {}) as Record<string, unknown>;
+    const { table, uuid, updated_at: updatedAt, data, deleted } = (record ?? {}) as Record<string, unknown>;
     if (typeof table !== 'string' || !SYNC_TABLES.includes(table)) throw bad(`جدول غير مسموح بمزامنته: ${String(table).slice(0, 40)}`);
     if (typeof uuid !== 'string' || !UUID.test(uuid)) throw bad('uuid غير صالح');
     const time = typeof updatedAt === 'string' ? Date.parse(updatedAt) : NaN;
@@ -38,13 +40,14 @@ export function validateBatch(body: unknown, now = Date.now()): SyncRow[] {
     const key = `${table}:${uuid.toLowerCase()}`;
     const previous = byKey.get(key);
     if (!previous || previous.time <= clamped) {
-      byKey.set(key, { table, uuid: uuid.toLowerCase(), time: clamped, data });
+      byKey.set(key, { table, uuid: uuid.toLowerCase(), time: clamped, data, deleted: deleted === true });
     }
   }
-  return [...byKey.values()].map(({ table, uuid, time, data }) => ({
+  return [...byKey.values()].map(({ table, uuid, time, data, deleted }) => ({
     table,
     uuid,
     updatedAt: new Date(time).toISOString(),
     data,
+    deleted,
   }));
 }

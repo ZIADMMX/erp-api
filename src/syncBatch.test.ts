@@ -29,3 +29,10 @@ test('rejects bad batches', () => {
   assert.throws(() => validateBatch({ records: [row({ updated_at: 'nope' })] }), /updated_at/);
   assert.throws(() => validateBatch({ records: [row({ data: [1] })] }), /data/);
 });
+
+test('a deletion is the newest copy only when it is newer', () => {
+  const [gone] = validateBatch({ records: [row(), row({ updated_at: '2026-01-02T00:00:00Z', deleted: true, data: {} })] });
+  assert.equal(gone.deleted, true);
+  const [kept] = validateBatch({ records: [row({ updated_at: '2026-01-03T00:00:00Z' }), row({ updated_at: '2026-01-02T00:00:00Z', deleted: true, data: {} })] });
+  assert.equal(kept.deleted, false);
+});
