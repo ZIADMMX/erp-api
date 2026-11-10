@@ -18,7 +18,9 @@ syncPushRouter.post('/push', async (req, res) => {
   const match = /^Bearer (\S+)$/.exec(req.headers.authorization ?? '');
   if (!match || !KEY.test(match[1])) throw new HttpError(401, 'DEVICE_KEY_INVALID', 'مفتاح الجهاز غير صالح');
 
-  const rows = validateBatch(req.body);
+  const batch = validateBatch(req.body);
+  const rows = batch.filter((r) => !r.deleted);
+  const gone = batch.filter((r) => r.deleted);
 
   const device = await prisma.syncDevice.findFirst({
     where: { keyHash: hashToken(match[1]), revokedAt: null },
@@ -27,7 +29,7 @@ syncPushRouter.post('/push', async (req, res) => {
   if (!device) throw new HttpError(401, 'DEVICE_KEY_INVALID', 'مفتاح الجهاز غير صالح أو متوقف');
 
   // جملة واحدة للدفعة كلها؛ النسخة الأقدم عمرها ما تكتب فوق الأحدث
-  await prisma.$executeRaw`
+  if (rows.length > 0) await prisma.$executeRaw`
     INSERT INTO "SyncRecord" ("deviceId", "tenantId", "tableName", "uuid", "updatedAt", "data")
     SELECT ${device.id}, ${device.tenantId}, t.table_name, t.uuid, t.updated_at, t.data
     FROM unnest(
@@ -40,9 +42,20 @@ syncPushRouter.post('/push', async (req, res) => {
       SET "data" = EXCLUDED."data", "updatedAt" = EXCLUDED."updatedAt", "receivedAt" = CURRENT_TIMESTAMP
       WHERE "SyncRecord"."updatedAt" <= EXCLUDED."updatedAt"`;
 
+  // الصفوف اللي اتمسحت على الديسك توب بتتمسح هنا، إلا لو عندنا نسخة أحدث من المسح
+  if (gone.length > 0) await prisma.$executeRaw`
+    DELETE FROM "SyncRecord" r
+    USING unnest(
+      ${gone.map((r) => r.table)}::text[],
+      ${gone.map((r) => r.uuid)}::uuid[],
+      ${gone.map((r) => r.updatedAt)}::timestamptz[]
+    ) AS t(table_name, uuid, updated_at)
+    WHERE r."deviceId" = ${device.id} AND r."tableName" = t.table_name AND r.uuid = t.uuid
+      AND r."updatedAt" <= t.updated_at`;
+
   await prisma.syncDevice.update({ where: { id: device.id }, data: { lastSeenAt: new Date() } });
   emitChange(device.tenantId, { entity: 'sync', action: 'updated' });
-  res.json({ ok: true, accepted: rows.length });
+  res.json({ ok: true, accepted: batch.length });
 });
 
 // ---- إدارة أجهزة الديسك توب (المالك بس) ----
