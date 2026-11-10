@@ -10,6 +10,7 @@ import { customersRouter } from './routes/customers';
 import { devicesRouter } from './routes/devices';
 import { expensesRouter } from './routes/expenses';
 import { productsRouter } from './routes/products';
+import { mobileRouter } from './routes/mobile';
 import { reportsRouter } from './routes/reports';
 import { salesRouter } from './routes/sales';
 import { syncDevicesRouter, syncPushRouter } from './routes/sync';
@@ -72,6 +73,7 @@ app.use('/products', productsRouter);
 app.use('/sales', salesRouter);
 app.use('/expenses', expensesRouter);
 app.use('/reports', reportsRouter);
+app.use('/mobile', mobileRouter);
 app.use('/devices', devicesRouter);
 app.use('/sync/devices', syncDevicesRouter);
 
