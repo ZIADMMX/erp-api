@@ -1,0 +1,235 @@
+// قاعدة بيانات ERP متعددة المنشآت (Multi-tenant).
+// كل جدول بيانات فيه tenantId، والسيرفر بياخده من التوكن مش من العميل.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum BusinessType {
+  GENERAL
+  RETAIL
+  SALON
+  BEAUTY
+  LAW
+  REAL_ESTATE
+}
+
+enum Role {
+  OWNER
+  MANAGER
+  CASHIER
+  STAFF
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  TRANSFER
+  CREDIT
+}
+
+enum SaleStatus {
+  COMPLETED
+  VOIDED
+}
+
+enum MovementType {
+  SALE
+  VOID
+  ADJUSTMENT
+}
+
+// المنشأة (محل / صالون / مكتب محاماة / شركة عقارات ...)
+model Tenant {
+  id           String       @id @default(cuid())
+  name         String
+  businessType BusinessType @default(GENERAL)
+  // الموديولات المفعّلة للمنشأة (التطبيقات تعرض بس اللي مفعّل)
+  modules      String[]     @default([])
+  // عدّاد أرقام الفواتير لكل منشأة
+  saleCounter  Int          @default(0)
+  createdAt    DateTime     @default(now())
+
+  users     User[]
+  customers Customer[]
+  products  Product[]
+  sales     Sale[]
+  expenses  Expense[]
+  devices   Device[]
+  movements StockMovement[]
+}
+
+model User {
+  id           String   @id @default(cuid())
+  tenantId     String
+  email        String   @unique
+  passwordHash String
+  name         String
+  role         Role     @default(CASHIER)
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  tenant        Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  refreshTokens RefreshToken[]
+  devices       Device[]
+  sales         Sale[]
+  movements     StockMovement[]
+
+  @@index([tenantId])
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// موبايلات المستخدمين لإرسال Push Notifications
+model Device {
+  id        String   @id @default(cuid())
+  tenantId  String
+  userId    String
+  pushToken String   @unique
+  platform  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+}
+
+model Customer {
+  id        String   @id @default(cuid())
+  tenantId  String
+  name      String
+  phone     String?
+  email     String?
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  sales  Sale[]
+
+  @@index([tenantId, name])
+  @@index([tenantId, phone])
+}
+
+// منتج أو خدمة. الخدمات (قص شعر، استشارة...) بتبقى trackStock = false
+model Product {
+  id         String   @id @default(cuid())
+  tenantId   String
+  name       String
+  sku        String?
+  barcode    String?
+  category   String?
+  cost       Decimal  @default(0) @db.Decimal(12, 2)
+  price      Decimal  @db.Decimal(12, 2)
+  qty        Int      @default(0)
+  minQty     Int      @default(0)
+  trackStock Boolean  @default(true)
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  tenant    Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  saleItems SaleItem[]
+  movements StockMovement[]
+
+  @@unique([tenantId, sku])
+  @@unique([tenantId, barcode])
+  @@index([tenantId, name])
+}
+
+model Sale {
+  id         String        @id @default(cuid())
+  tenantId   String
+  number     Int
+  userId     String
+  customerId String?
+  status     SaleStatus    @default(COMPLETED)
+  subtotal   Decimal       @db.Decimal(12, 2)
+  discount   Decimal       @default(0) @db.Decimal(12, 2)
+  total      Decimal       @db.Decimal(12, 2)
+  paid       Decimal       @db.Decimal(12, 2)
+  method     PaymentMethod @default(CASH)
+  note       String?
+  voidedAt   DateTime?
+  voidReason String?
+  createdAt  DateTime      @default(now())
+
+  tenant   Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user     User       @relation(fields: [userId], references: [id])
+  customer Customer?  @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  items    SaleItem[]
+
+  @@unique([tenantId, number])
+  @@index([tenantId, createdAt])
+  @@index([tenantId, userId, createdAt])
+  @@index([customerId])
+}
+
+// unitCost بيتسجل وقت البيع، عشان الربح التاريخي مايتغيرش لو التكلفة اتعدلت بعدين
+model SaleItem {
+  id        String  @id @default(cuid())
+  saleId    String
+  productId String?
+  name      String
+  qty       Int
+  unitPrice Decimal @db.Decimal(12, 2)
+  unitCost  Decimal @db.Decimal(12, 2)
+
+  sale    Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([saleId])
+  @@index([productId])
+}
+
+model Expense {
+  id        String   @id @default(cuid())
+  tenantId  String
+  title     String
+  amount    Decimal  @db.Decimal(12, 2)
+  category  String?
+  note      String?
+  date      DateTime @default(now())
+  createdAt DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, date])
+}
+
+// سجل حركة المخزون (بيع / إلغاء بيع / تسوية يدوية)
+model StockMovement {
+  id        String       @id @default(cuid())
+  tenantId  String
+  productId String
+  userId    String?
+  type      MovementType
+  delta     Int
+  reason    String?
+  refId     String?
+  createdAt DateTime     @default(now())
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user    User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, productId, createdAt])
+}

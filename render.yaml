@@ -1,0 +1,23 @@
+# Blueprint اختياري لـ Render. لو الـ API جوه فولدر فرعي في الـ repo ضيف:  rootDir: erp-api
+services:
+  - type: web
+    name: erp-api
+    runtime: node
+    region: frankfurt
+    plan: free
+    buildCommand: npm install --include=dev && npm run build && npx prisma migrate deploy
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: CORS_ORIGINS
+        value: ""
