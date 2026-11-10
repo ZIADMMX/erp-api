@@ -12,6 +12,7 @@ import { expensesRouter } from './routes/expenses';
 import { productsRouter } from './routes/products';
 import { reportsRouter } from './routes/reports';
 import { salesRouter } from './routes/sales';
+import { syncDevicesRouter, syncPushRouter } from './routes/sync';
 import { usersRouter } from './routes/users';
 
 export const app = express();
@@ -44,6 +45,8 @@ app.use(
     legacyHeaders: false,
   }),
 );
+// دفعة الديسك توب ممكن توصل 1.5MB، فليها parser خاص قبل الحد العام
+app.use('/api/sync', express.json({ limit: '2mb' }), syncPushRouter);
 app.use(express.json({ limit: '1mb' }));
 
 app.get('/', (_req, res) => {
@@ -70,6 +73,7 @@ app.use('/sales', salesRouter);
 app.use('/expenses', expensesRouter);
 app.use('/reports', reportsRouter);
 app.use('/devices', devicesRouter);
+app.use('/sync/devices', syncDevicesRouter);
 
 app.use(notFound);
 app.use(errorHandler);

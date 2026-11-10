@@ -1,6 +1,18 @@
 import type { Prisma } from '@prisma/client';
+import type { Request } from 'express';
 import { z } from 'zod';
 import { env } from './config';
+import { HttpError } from './errors';
+
+/**
+ * الـ :id من المسار كنص. أنواع Express 5 بتخلي أي param ممكن يكون string[]
+ * (عشان مسارات *splat)، فبنتأكد هنا مرة واحدة بدل cast في كل route.
+ */
+export function idParam(req: Request): string {
+  const id = req.params.id;
+  if (typeof id !== 'string' || id === '') throw new HttpError(400, 'BAD_ID', 'رقم العنصر غير صحيح');
+  return id;
+}
 
 export const pageQuery = (maxLimit = 200) =>
   z.object({

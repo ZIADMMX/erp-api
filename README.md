@@ -144,6 +144,8 @@ if (status === 'granted') {
 | `GET/POST/PATCH/DELETE /expenses` | المصروفات | مالك/مدير (الحذف: مالك) |
 | `GET /reports/summary` · `/daily` · `/top-products` · `/by-user` · `/inventory` | التقارير | مالك/مدير |
 | `POST /devices` · `/devices/unregister` | تسجيل موبايل للإشعارات | مسجّل دخول |
+| `GET/POST /sync/devices` · `DELETE /sync/devices/:id` | أجهزة الديسك توب: `POST` بيرجّع مفتاح `fsk_...` **مرة واحدة**، و`DELETE` بيوقف الجهاز | مالك |
+| `POST /api/sync/push` | الديسك توب بيرفع بياناته كل دقيقة (`Authorization: Bearer fsk_...`، 500 صف كحد أقصى، 2MB) | مفتاح جهاز |
 | `GET /health` · `/health/db` | فحص السيرفر / الداتابيز | عام |
 
 الأخطاء بتيجي بشكل موحد: `{ "error": { "code": "OUT_OF_STOCK", "message": "..." } }` والتطبيق يعتمد على `code`.

@@ -9,7 +9,7 @@ import { io } from 'socket.io-client';
 import type { createApiClient } from './api-client';
 
 interface ChangeEvent {
-  entity: 'sales' | 'products' | 'customers' | 'expenses' | 'users';
+  entity: 'sales' | 'products' | 'customers' | 'expenses' | 'users' | 'sync';
   action: 'created' | 'updated' | 'deleted' | 'voided' | 'stock';
   id?: string;
   by?: string; // userId اللي عمل التغيير

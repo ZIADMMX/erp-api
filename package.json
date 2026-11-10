@@ -12,7 +12,8 @@
     "start": "node dist/server.js",
     "migrate:dev": "prisma migrate dev",
     "migrate:deploy": "prisma migrate deploy",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test \"src/**/*.test.ts\""
   },
   "dependencies": {
     "@prisma/client": "^6.19.0",

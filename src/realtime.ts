@@ -5,7 +5,7 @@ import { verifyAccessToken } from './tokens';
 let io: Server | null = null;
 
 export interface ChangeEvent {
-  entity: 'sales' | 'products' | 'customers' | 'expenses' | 'users';
+  entity: 'sales' | 'products' | 'customers' | 'expenses' | 'users' | 'sync';
   action: 'created' | 'updated' | 'deleted' | 'voided' | 'stock';
   id?: string;
   /** userId اللي عمل التغيير، عشان الجهاز نفسه يتجاهل الحدث لو عايز */

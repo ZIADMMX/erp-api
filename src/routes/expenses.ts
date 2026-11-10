@@ -4,7 +4,7 @@ import { prisma } from '../db';
 import { HttpError } from '../errors';
 import { ctx, requireAuth, requireRole } from '../middleware/auth';
 import { emitChange } from '../realtime';
-import { dateRangeQuery, optStr, pageQuery, rangeFilter, skipTake } from '../utils';
+import { dateRangeQuery, idParam, optStr, pageQuery, rangeFilter, skipTake } from '../utils';
 
 export const expensesRouter = Router();
 expensesRouter.use(requireAuth, requireRole('OWNER', 'MANAGER'));
@@ -54,16 +54,16 @@ expensesRouter.post('/', async (req, res) => {
 expensesRouter.patch('/:id', async (req, res) => {
   const { tenantId, userId } = ctx(req);
   const body = base.partial().parse(req.body);
-  await mustFind(tenantId, req.params.id);
-  const expense = await prisma.expense.update({ where: { id: req.params.id }, data: body });
+  await mustFind(tenantId, idParam(req));
+  const expense = await prisma.expense.update({ where: { id: idParam(req) }, data: body });
   emitChange(tenantId, { entity: 'expenses', action: 'updated', id: expense.id, by: userId });
   res.json(expense);
 });
 
 expensesRouter.delete('/:id', requireRole('OWNER'), async (req, res) => {
   const { tenantId, userId } = ctx(req);
-  await mustFind(tenantId, req.params.id);
-  await prisma.expense.delete({ where: { id: req.params.id } });
-  emitChange(tenantId, { entity: 'expenses', action: 'deleted', id: req.params.id, by: userId });
+  await mustFind(tenantId, idParam(req));
+  await prisma.expense.delete({ where: { id: idParam(req) } });
+  emitChange(tenantId, { entity: 'expenses', action: 'deleted', id: idParam(req), by: userId });
   res.status(204).end();
 });
