@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { prisma } from '../db';
 import { HttpError } from '../errors';
+import { idParam } from '../utils';
 import { ctx, requireAuth, requireRole } from '../middleware/auth';
 import { emitChange } from '../realtime';
 
@@ -59,7 +60,7 @@ const updateSchema = z.object({
 
 usersRouter.patch('/:id', requireRole('OWNER'), async (req, res) => {
   const { tenantId, userId } = ctx(req);
-  const id = req.params.id;
+  const id = idParam(req);
   const body = updateSchema.parse(req.body);
 
   const target = await prisma.user.findFirst({ where: { id, tenantId } });

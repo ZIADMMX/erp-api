@@ -6,7 +6,7 @@ import { HttpError } from '../errors';
 import { notifyLowStock } from '../inventory';
 import { ctx, requireAuth, requireRole } from '../middleware/auth';
 import { emitChange } from '../realtime';
-import { optStr, pageQuery, skipTake } from '../utils';
+import { idParam, optStr, pageQuery, skipTake } from '../utils';
 
 export const productsRouter = Router();
 productsRouter.use(requireAuth);
@@ -84,7 +84,7 @@ productsRouter.get('/', async (req, res) => {
 
 productsRouter.get('/:id', async (req, res) => {
   const { tenantId, role } = ctx(req);
-  res.json(shape(await mustFind(tenantId, req.params.id), role));
+  res.json(shape(await mustFind(tenantId, idParam(req)), role));
 });
 
 productsRouter.post('/', requireRole('OWNER', 'MANAGER'), async (req, res) => {
@@ -111,8 +111,8 @@ const updateSchema = productBase.omit({ qty: true }).partial();
 productsRouter.patch('/:id', requireRole('OWNER', 'MANAGER'), async (req, res) => {
   const { tenantId, userId } = ctx(req);
   const body = updateSchema.parse(req.body);
-  await mustFind(tenantId, req.params.id);
-  const product = await prisma.product.update({ where: { id: req.params.id }, data: body });
+  await mustFind(tenantId, idParam(req));
+  const product = await prisma.product.update({ where: { id: idParam(req) }, data: body });
   emitChange(tenantId, { entity: 'products', action: 'updated', id: product.id, by: userId });
   res.json(product);
 });
@@ -120,7 +120,7 @@ productsRouter.patch('/:id', requireRole('OWNER', 'MANAGER'), async (req, res) =
 // تسوية المخزون يدويًا (جرد / استلام بضاعة / تالف). delta موجب = زيادة، سالب = نقص.
 productsRouter.post('/:id/adjust', requireRole('OWNER', 'MANAGER'), async (req, res) => {
   const { tenantId, userId } = ctx(req);
-  const id = req.params.id;
+  const id = idParam(req);
   const body = z
     .object({
       delta: z.number().int().refine((n) => n !== 0, 'الكمية لازم تكون غير صفر'),
@@ -153,8 +153,8 @@ productsRouter.post('/:id/adjust', requireRole('OWNER', 'MANAGER'), async (req, 
 productsRouter.get('/:id/movements', requireRole('OWNER', 'MANAGER'), async (req, res) => {
   const { tenantId } = ctx(req);
   const q = pageQuery(200).parse(req.query);
-  await mustFind(tenantId, req.params.id);
-  const where = { tenantId, productId: req.params.id };
+  await mustFind(tenantId, idParam(req));
+  const where = { tenantId, productId: idParam(req) };
   const [items, total] = await Promise.all([
     prisma.stockMovement.findMany({ where, orderBy: { createdAt: 'desc' }, ...skipTake(q) }),
     prisma.stockMovement.count({ where }),
@@ -165,8 +165,8 @@ productsRouter.get('/:id/movements', requireRole('OWNER', 'MANAGER'), async (req
 // "الحذف" إيقاف للصنف (بيفضل ظاهر في الفواتير القديمة والتقارير)
 productsRouter.delete('/:id', requireRole('OWNER', 'MANAGER'), async (req, res) => {
   const { tenantId, userId } = ctx(req);
-  await mustFind(tenantId, req.params.id);
-  await prisma.product.update({ where: { id: req.params.id }, data: { active: false } });
-  emitChange(tenantId, { entity: 'products', action: 'deleted', id: req.params.id, by: userId });
+  await mustFind(tenantId, idParam(req));
+  await prisma.product.update({ where: { id: idParam(req) }, data: { active: false } });
+  emitChange(tenantId, { entity: 'products', action: 'deleted', id: idParam(req), by: userId });
   res.status(204).end();
 });

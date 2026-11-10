@@ -56,13 +56,14 @@ model Tenant {
   saleCounter  Int          @default(0)
   createdAt    DateTime     @default(now())
 
-  users     User[]
-  customers Customer[]
-  products  Product[]
-  sales     Sale[]
-  expenses  Expense[]
-  devices   Device[]
-  movements StockMovement[]
+  users       User[]
+  customers   Customer[]
+  products    Product[]
+  sales       Sale[]
+  expenses    Expense[]
+  devices     Device[]
+  movements   StockMovement[]
+  syncDevices SyncDevice[]
 }
 
 model User {
@@ -232,4 +233,37 @@ model StockMovement {
   user    User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([tenantId, productId, createdAt])
+}
+
+// جهاز ديسك توب بيرفع بياناته (أوفلاين أولًا). المفتاح fsk_... بيتحفظ كـ sha256 بس.
+model SyncDevice {
+  id         String    @id @default(cuid())
+  tenantId   String
+  name       String
+  keyHash    String    @unique
+  createdAt  DateTime  @default(now())
+  lastSeenAt DateTime?
+  revokedAt  DateTime?
+
+  tenant  Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  records SyncRecord[]
+
+  @@index([tenantId])
+}
+
+// نسخة من كل صف جاي من الديسك توب كـ JSON. مش بيتحول لجداول الـ POS عمدًا:
+// الـ ids المحلية بتتكرر بين الأجهزة، والموبايل محتاج يقرا بس.
+model SyncRecord {
+  deviceId   String
+  tenantId   String
+  tableName  String
+  uuid       String   @db.Uuid
+  updatedAt  DateTime @db.Timestamptz(3)
+  data       Json
+  receivedAt DateTime @default(now()) @db.Timestamptz(3)
+
+  device SyncDevice @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@id([deviceId, tableName, uuid])
+  @@index([tenantId, tableName, updatedAt])
 }

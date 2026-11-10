@@ -6,7 +6,7 @@ import { HttpError } from '../errors';
 import { notifyLowStock } from '../inventory';
 import { ctx, requireAuth, requireRole } from '../middleware/auth';
 import { emitChange } from '../realtime';
-import { dateRangeQuery, pageQuery, rangeFilter, skipTake } from '../utils';
+import { dateRangeQuery, idParam, pageQuery, rangeFilter, skipTake } from '../utils';
 
 export const salesRouter = Router();
 salesRouter.use(requireAuth);
@@ -190,7 +190,7 @@ salesRouter.get('/:id', async (req, res) => {
   const { tenantId, userId, role } = ctx(req);
   if (role === 'STAFF') throw new HttpError(403, 'FORBIDDEN', 'مالكش صلاحية للعملية دي');
   const sale = await prisma.sale.findFirst({
-    where: { id: req.params.id, tenantId, ...(role === 'CASHIER' ? { userId } : {}) },
+    where: { id: idParam(req), tenantId, ...(role === 'CASHIER' ? { userId } : {}) },
     include: {
       items: true,
       user: { select: { id: true, name: true } },
@@ -207,7 +207,7 @@ salesRouter.get('/:id', async (req, res) => {
  */
 salesRouter.post('/:id/void', requireRole('OWNER', 'MANAGER'), async (req, res) => {
   const { tenantId, userId } = ctx(req);
-  const id = req.params.id;
+  const id = idParam(req);
   const { reason } = z.object({ reason: z.string().trim().max(300).optional() }).parse(req.body ?? {});
 
   await prisma.$transaction(async (tx) => {

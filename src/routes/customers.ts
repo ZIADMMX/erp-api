@@ -5,7 +5,7 @@ import { prisma } from '../db';
 import { HttpError } from '../errors';
 import { ctx, requireAuth, requireRole } from '../middleware/auth';
 import { emitChange } from '../realtime';
-import { optStr, pageQuery, skipTake } from '../utils';
+import { idParam, optStr, pageQuery, skipTake } from '../utils';
 
 export const customersRouter = Router();
 customersRouter.use(requireAuth);
@@ -51,7 +51,7 @@ customersRouter.get('/', async (req, res) => {
 // بيانات العميل + إحصائيات مشترياته (مفيدة للـ CRM)
 customersRouter.get('/:id', async (req, res) => {
   const { tenantId } = ctx(req);
-  const customer = await mustFind(tenantId, req.params.id);
+  const customer = await mustFind(tenantId, idParam(req));
   const stats = await prisma.sale.aggregate({
     where: { tenantId, customerId: customer.id, status: 'COMPLETED' },
     _sum: { total: true },
@@ -79,8 +79,8 @@ customersRouter.post('/', requireRole('OWNER', 'MANAGER', 'CASHIER'), async (req
 customersRouter.patch('/:id', requireRole('OWNER', 'MANAGER', 'CASHIER'), async (req, res) => {
   const { tenantId, userId } = ctx(req);
   const body = base.partial().parse(req.body);
-  await mustFind(tenantId, req.params.id);
-  const customer = await prisma.customer.update({ where: { id: req.params.id }, data: body });
+  await mustFind(tenantId, idParam(req));
+  const customer = await prisma.customer.update({ where: { id: idParam(req) }, data: body });
   emitChange(tenantId, { entity: 'customers', action: 'updated', id: customer.id, by: userId });
   res.json(customer);
 });
@@ -88,8 +88,8 @@ customersRouter.patch('/:id', requireRole('OWNER', 'MANAGER', 'CASHIER'), async 
 // الحذف بيسيب فواتير العميل زي ما هي (بتبقى من غير اسم عميل)
 customersRouter.delete('/:id', requireRole('OWNER', 'MANAGER'), async (req, res) => {
   const { tenantId, userId } = ctx(req);
-  await mustFind(tenantId, req.params.id);
-  await prisma.customer.delete({ where: { id: req.params.id } });
-  emitChange(tenantId, { entity: 'customers', action: 'deleted', id: req.params.id, by: userId });
+  await mustFind(tenantId, idParam(req));
+  await prisma.customer.delete({ where: { id: idParam(req) } });
+  emitChange(tenantId, { entity: 'customers', action: 'deleted', id: idParam(req), by: userId });
   res.status(204).end();
 });
